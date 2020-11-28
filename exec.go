@@ -1,21 +1,24 @@
 package qsql
 
-import "database/sql"
+import (
+	"context"
+	"database/sql"
+)
 
 type DbExecer interface {
-	Exec(string, ...interface{}) (sql.Result, error)
+	ExecContext(context.Context, string, ...interface{}) (sql.Result, error)
 }
 
-func RowExec(tx DbExecer, query string, args ...interface{}) (int64, error) {
-	res, err := tx.Exec(query, args...)
+func RowExec(ctx context.Context, tx DbExecer, query string, args ...interface{}) (int64, error) {
+	res, err := tx.ExecContext(ctx, query, args...)
 	if err != nil {
 		return 0, err
 	}
 	return res.RowsAffected()
 }
 
-func IdExec(tx DbExecer, query string, args ...interface{}) (int64, error) {
-	res, err := tx.Exec(query, args...)
+func IdExec(ctx context.Context, tx DbExecer, query string, args ...interface{}) (int64, error) {
+	res, err := tx.ExecContext(ctx, query, args...)
 	if err != nil {
 		return 0, err
 	}

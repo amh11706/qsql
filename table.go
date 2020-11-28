@@ -1,6 +1,7 @@
 package qsql
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"reflect"
@@ -24,13 +25,13 @@ type Table struct {
 
 // Get an item from the table by its id returning the selected columns.
 // If columns are empty, return all that have a "db" tag.
-func (t *Table) Get(target interface{}, id int, cols string, args ...interface{}) error {
-	return t.GetOptions(target, "WHERE id="+strconv.Itoa(id), cols, args...)
+func (t *Table) Get(ctx context.Context, target interface{}, id int, cols string, args ...interface{}) error {
+	return t.GetOptions(ctx, target, "WHERE id="+strconv.Itoa(id), cols, args...)
 }
 
 // GetOptions gets an item from the table with options returning the selected columns.
 // If columns are empty, return all that have a "db" tag.
-func (t *Table) GetOptions(target interface{}, options string, cols string, args ...interface{}) error {
+func (t *Table) GetOptions(ctx context.Context, target interface{}, options string, cols string, args ...interface{}) error {
 	if (*t.DB) == nil {
 		return dbNotReadyErr
 	}
@@ -40,12 +41,12 @@ func (t *Table) GetOptions(target interface{}, options string, cols string, args
 	if len(cols) == 0 {
 		return noColumnsErr
 	}
-	return (*t.DB).Get(target, `SELECT `+cols+` FROM`+t.Name+options, args...)
+	return (*t.DB).GetContext(ctx, target, `SELECT `+cols+` FROM`+t.Name+options, args...)
 }
 
 // GetAll returns all matching rows with the specified options.
 // If columns are empty, return all that have a "db" tag.
-func (t *Table) GetAll(target interface{}, options string, cols string, args ...interface{}) error {
+func (t *Table) GetAll(ctx context.Context, target interface{}, options string, cols string, args ...interface{}) error {
 	if (*t.DB) == nil {
 		return dbNotReadyErr
 	}
@@ -55,16 +56,16 @@ func (t *Table) GetAll(target interface{}, options string, cols string, args ...
 	if len(cols) == 0 {
 		return noColumnsErr
 	}
-	return (*t.DB).Select(target, `SELECT `+cols+` FROM`+t.Name+options, args...)
+	return (*t.DB).SelectContext(ctx, target, `SELECT `+cols+` FROM`+t.Name+options, args...)
 }
 
 // Create inserts a new row into the table.
 // If columns are empty, insert all that have a "db" tag except id.
-func (t *Table) Create(source interface{}, cols ...string) (sql.Result, error) {
-	return t.CreateOptions(source, "", cols...)
+func (t *Table) Create(ctx context.Context, source interface{}, cols ...string) (sql.Result, error) {
+	return t.CreateOptions(ctx, source, "", cols...)
 }
 
-func (t *Table) CreatePg(source interface{}, cols ...string) (id int, err error) {
+func (t *Table) CreatePg(ctx context.Context, source interface{}, cols ...string) (id int, err error) {
 	if (*t.DB) == nil {
 		return 0, dbNotReadyErr
 	}
@@ -76,7 +77,7 @@ func (t *Table) CreatePg(source interface{}, cols ...string) (id int, err error)
 	} else if len(cols) == 1 {
 		cols = strings.Split(cols[0], ",")
 	}
-	rows, err := (*t.DB).NamedQuery(`INSERT INTO`+t.Name+`(`+strings.Join(cols, ",")+`) VALUES (:`+strings.Join(cols, ",:")+`) RETURNING id`, source)
+	rows, err := (*t.DB).NamedQueryContext(ctx, `INSERT INTO`+t.Name+`(`+strings.Join(cols, ",")+`) VALUES (:`+strings.Join(cols, ",:")+`) RETURNING id`, source)
 	if err != nil {
 		return
 	}
@@ -88,7 +89,7 @@ func (t *Table) CreatePg(source interface{}, cols ...string) (id int, err error)
 
 // Create inserts a new row into the table.
 // If columns are empty, insert all that have a "db" tag except id.
-func (t *Table) CreateOptions(source interface{}, options string, cols ...string) (sql.Result, error) {
+func (t *Table) CreateOptions(ctx context.Context, source interface{}, options string, cols ...string) (sql.Result, error) {
 	if (*t.DB) == nil {
 		return nil, dbNotReadyErr
 	}
@@ -100,18 +101,18 @@ func (t *Table) CreateOptions(source interface{}, options string, cols ...string
 	} else if len(cols) == 1 {
 		cols = strings.Split(cols[0], ",")
 	}
-	return (*t.DB).NamedExec(`INSERT INTO`+t.Name+`SET `+MakeValuesString(cols)+` `+options, source)
+	return (*t.DB).NamedExecContext(ctx, `INSERT INTO`+t.Name+`SET `+MakeValuesString(cols)+` `+options, source)
 }
 
 // Update updates the given struct in the table by its id.
 // If columns are empty, update all that have a "db" tag except id.
-func (t *Table) Update(source interface{}, cols ...string) (sql.Result, error) {
-	return t.UpdateOptions(source, " WHERE id=:id", cols...)
+func (t *Table) Update(ctx context.Context, source interface{}, cols ...string) (sql.Result, error) {
+	return t.UpdateOptions(ctx, source, " WHERE id=:id", cols...)
 }
 
 // UpdateOptions updates the table with the specified options.
 // If columns are empty, update all that have a "db" tag except id.
-func (t *Table) UpdateOptions(source interface{}, options string, cols ...string) (sql.Result, error) {
+func (t *Table) UpdateOptions(ctx context.Context, source interface{}, options string, cols ...string) (sql.Result, error) {
 	if (*t.DB) == nil {
 		return nil, dbNotReadyErr
 	}
@@ -123,20 +124,20 @@ func (t *Table) UpdateOptions(source interface{}, options string, cols ...string
 	} else if len(cols) == 1 {
 		cols = strings.Split(cols[0], ",")
 	}
-	return (*t.DB).NamedExec(`UPDATE`+t.Name+`SET `+MakeValuesString(cols)+` `+options, source)
+	return (*t.DB).NamedExecContext(ctx, `UPDATE`+t.Name+`SET `+MakeValuesString(cols)+` `+options, source)
 }
 
 // Delete a row by its id.
-func (t *Table) Delete(id int) (sql.Result, error) {
-	return (*t).DeleteOptions("WHERE id=" + strconv.Itoa(id))
+func (t *Table) Delete(ctx context.Context, id int) (sql.Result, error) {
+	return (*t).DeleteOptions(ctx, "WHERE id="+strconv.Itoa(id))
 }
 
 // DeleteOptions deletes by the provided options instead of a specific id.
-func (t *Table) DeleteOptions(options string) (sql.Result, error) {
+func (t *Table) DeleteOptions(ctx context.Context, options string) (sql.Result, error) {
 	if (*t.DB) == nil {
 		return nil, dbNotReadyErr
 	}
-	return (*t.DB).Exec(`DELETE FROM` + t.Name + options)
+	return (*t.DB).ExecContext(ctx, `DELETE FROM`+t.Name+options)
 }
 
 // GetColumns takes a struct and outputs a slice of all db column labels
