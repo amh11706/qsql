@@ -3,6 +3,7 @@ package qsql
 import (
 	"database/sql"
 	"strconv"
+	"time"
 
 	"github.com/go-sql-driver/mysql"
 )
@@ -66,13 +67,26 @@ func (lb *LazyBool) Scan(value interface{}) (err error) {
 	return
 }
 
+// LazyUnix bypasses sql nil scan errors and uses an empty value instead.
+type LazyUnix int64
+
+// Scan implements the Scanner interface.
+func (lt *LazyUnix) Scan(value interface{}) (err error) {
+	nt := mysql.NullTime{}
+	err = nt.Scan(value)
+	*lt = (LazyUnix(nt.Time.Unix()))
+	return
+}
+
 // LazyTime bypasses sql nil scan errors and uses an empty value instead.
-type LazyTime int64
+type LazyTime struct {
+	time.Time
+}
 
 // Scan implements the Scanner interface.
 func (lt *LazyTime) Scan(value interface{}) (err error) {
 	nt := mysql.NullTime{}
 	err = nt.Scan(value)
-	*lt = (LazyTime(nt.Time.Unix()))
+	lt.Time = nt.Time
 	return
 }

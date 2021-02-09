@@ -7,8 +7,6 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-var DB *sqlx.DB
-
 func Connect(driver, host, prefix string, logger func(...interface{})) *sqlx.DB {
 	start := time.Now()
 	logger(prefix + " connecting to DB...")
@@ -27,7 +25,6 @@ func Connect(driver, host, prefix string, logger func(...interface{})) *sqlx.DB 
 			logger(prefix + " failed to connect: " + err.Error())
 		} else {
 			logger(prefix+" connected to DB in", time.Since(start))
-			DB = db
 			return db
 		}
 
