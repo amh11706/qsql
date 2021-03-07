@@ -141,8 +141,12 @@ func (t *Table) DeleteOptions(ctx context.Context, options string) (sql.Result, 
 }
 
 // GetColumns takes a struct and outputs a slice of all db column labels
-func GetColumns(from interface{}, skipId bool) []string {
-	def := reflect.TypeOf(from)
+func GetColumns(from interface{}, creating bool) []string {
+	var def reflect.Type
+	var ok bool
+	if def, ok = from.(reflect.Type); !ok {
+		def = reflect.TypeOf(from)
+	}
 	kind := def.Kind()
 	for kind == reflect.Ptr || kind == reflect.Slice {
 		def = def.Elem()
@@ -152,14 +156,15 @@ func GetColumns(from interface{}, skipId bool) []string {
 	count := def.NumField()
 	columns := make([]string, 0, count)
 	for i := 0; i < count; i++ {
-		f := def.Field(i)
-		if t := f.Type.Kind(); t == reflect.Ptr || t == reflect.Struct {
-			columns = append(columns, GetColumns(f, skipId)...)
-			continue
-		}
-		column := f.Tag.Get("db")
-		if column != "" && !(skipId && column == "id") {
+		field := def.Field(i)
+		column := field.Tag.Get("db")
+		if column != "" && !(creating && column == "id") {
+			if table := field.Tag.Get("table"); !creating && table != "" {
+				column = table + "." + column
+			}
 			columns = append(columns, column)
+		} else if k := field.Type.Kind(); k == reflect.Ptr || k == reflect.Struct {
+			columns = append(columns, GetColumns(field.Type, creating)...)
 		}
 	}
 	return columns
