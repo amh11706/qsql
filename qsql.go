@@ -11,14 +11,14 @@ func Connect(driver, host, prefix string, logger func(...interface{})) *sqlx.DB 
 	start := time.Now()
 	logger(prefix + " connecting to DB...")
 	db, err := sqlx.Open(driver, host)
+	if err != nil {
+		logger(prefix + " failed to connect: " + err.Error())
+		time.Sleep(5 * time.Second)
+		return Connect(driver, host, prefix, logger)
+	}
 	db.SetMaxIdleConns(400)
 	db.SetMaxOpenConns(400)
 	db.SetConnMaxLifetime(20 * time.Minute)
-	if err != nil {
-		logger(prefix + " failed to connect: " + err.Error())
-		db.Close()
-		return nil
-	}
 
 	for {
 		if err = db.Ping(); err != nil {
